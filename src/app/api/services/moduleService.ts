@@ -9,10 +9,9 @@ import {
     FetchModuleIdentityParameters,
     InvokeModuleMethodParameters
 } from '../parameters/moduleParameters';
-import { DataPlaneResponse } from '../models/device';
 import { ModuleIdentity } from '../models/moduleIdentity';
 import { ModuleTwin } from '../models/moduleTwin';
-import { dataPlaneConnectionHelper, dataPlaneResponseHelper, request, DATAPLANE_CONTROLLER_ENDPOINT, DataPlaneRequest } from './dataplaneServiceHelper';
+import { dataPlaneConnectionHelper, dataPlaneResponseHelper, request, DataPlaneRequest } from './dataplaneServiceHelper';
 import { HEADERS, HTTP_OPERATION_TYPES, HUB_DATA_PLANE_API_VERSION } from '../../constants/apiConstants';
 
 export interface IoTHubConnectionSettings {
@@ -26,7 +25,7 @@ export interface DirectMethodResult {
     status: number;
 }
 
-export const fetchModuleIdentities = async (parameters: FetchModuleIdentitiesParameters): Promise<DataPlaneResponse<ModuleIdentity[]>> => {
+export const fetchModuleIdentities = async (parameters: FetchModuleIdentitiesParameters): Promise<ModuleIdentity[]> => {
     const connectionInformation = await dataPlaneConnectionHelper();
 
     const dataPlaneRequest: DataPlaneRequest = {
@@ -40,12 +39,12 @@ export const fetchModuleIdentities = async (parameters: FetchModuleIdentitiesPar
         sharedAccessSignature: connectionInformation.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
 
-export const addModuleIdentity = async (parameters: AddModuleIdentityParameters): Promise<DataPlaneResponse<ModuleIdentity>> => {
+export const addModuleIdentity = async (parameters: AddModuleIdentityParameters): Promise<ModuleIdentity> => {
     const connectionInformation = await dataPlaneConnectionHelper();
 
     const dataPlaneRequest: DataPlaneRequest = {
@@ -57,12 +56,12 @@ export const addModuleIdentity = async (parameters: AddModuleIdentityParameters)
         sharedAccessSignature: connectionInformation.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
 
-export const fetchModuleIdentity = async (parameters: FetchModuleIdentityParameters): Promise<DataPlaneResponse<ModuleIdentity[]>> => {
+export const fetchModuleIdentity = async (parameters: FetchModuleIdentityParameters): Promise<ModuleIdentity[]> => {
     const connectionInformation = await dataPlaneConnectionHelper();
 
     const dataPlaneRequest: DataPlaneRequest = {
@@ -73,12 +72,12 @@ export const fetchModuleIdentity = async (parameters: FetchModuleIdentityParamet
         sharedAccessSignature: connectionInformation.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
 
-export const deleteModuleIdentity = async (parameters: FetchModuleIdentityParameters): Promise<DataPlaneResponse<ModuleIdentity[]>> => {
+export const deleteModuleIdentity = async (parameters: FetchModuleIdentityParameters): Promise<void> => {
     const connectionInformation = await dataPlaneConnectionHelper();
 
     const dataPlaneRequest: DataPlaneRequest = {
@@ -91,7 +90,7 @@ export const deleteModuleIdentity = async (parameters: FetchModuleIdentityParame
     };
 
     (dataPlaneRequest.headers as any)[HEADERS.IF_MATCH] = '*'; // tslint:disable-line: no-any
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     await dataPlaneResponseHelper(response);
     return;
 };
@@ -116,12 +115,12 @@ export const invokeModuleDirectMethod = async (parameters: InvokeModuleMethodPar
         sharedAccessSignature: connectionInfo.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
 
-export const fetchModuleIdentityTwin = async (parameters: ModuleIdentityTwinParameters): Promise<DataPlaneResponse<ModuleTwin>> => {
+export const fetchModuleIdentityTwin = async (parameters: ModuleIdentityTwinParameters): Promise<ModuleTwin> => {
     const connectionInformation = await dataPlaneConnectionHelper();
 
     const dataPlaneRequest: DataPlaneRequest = {
@@ -132,12 +131,12 @@ export const fetchModuleIdentityTwin = async (parameters: ModuleIdentityTwinPara
         sharedAccessSignature: connectionInformation.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
 
-export const updateModuleIdentityTwin = async (parameters: ModuleTwin): Promise<DataPlaneResponse<ModuleTwin>> => {
+export const updateModuleIdentityTwin = async (parameters: ModuleTwin): Promise<ModuleTwin> => {
     const connectionInformation = await dataPlaneConnectionHelper();
 
     const dataPlaneRequest: DataPlaneRequest = {
@@ -149,7 +148,7 @@ export const updateModuleIdentityTwin = async (parameters: ModuleTwin): Promise<
         sharedAccessSignature: connectionInformation.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };

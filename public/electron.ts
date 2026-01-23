@@ -10,7 +10,9 @@ import { PLATFORMS, MESSAGE_CHANNELS } from './constants';
 import { onSettingsHighContrast } from './handlers/settingsHandler';
 import { formatError } from './utils/errorHelper';
 import { AuthProvider } from './utils/authProvider';
-import '../dist/server/serverElectron';
+import { handleDataPlaneRequest } from './handlers/dataPlaneHandler';
+import { handleEventHubMonitorStart, handleEventHubMonitorStop } from './handlers/eventHubHandler';
+import { handleFileRead, handleFileReadNaive, handleDirectoriesList } from './handlers/fileHandler';
 
 class Main {
     private static application: Electron.App;
@@ -27,10 +29,23 @@ class Main {
     }
 
     private static setMessageHandlers(): void {
+        // Settings and authentication handlers
         Main.registerHandler(MESSAGE_CHANNELS.SETTING_HIGH_CONTRAST, onSettingsHighContrast);
         Main.registerHandler(MESSAGE_CHANNELS.AUTHENTICATION_LOGIN, Main.onLogin);
         Main.registerHandler(MESSAGE_CHANNELS.AUTHENTICATION_LOGOUT, Main.onLogout);
         Main.registerHandler(MESSAGE_CHANNELS.AUTHENTICATION_GET_PROFILE_TOKEN, Main.onGetProfileToken);
+
+        // Data plane IPC handlers
+        Main.registerHandler(MESSAGE_CHANNELS.DATAPLANE_REQUEST, handleDataPlaneRequest);
+
+        // Event Hub IPC handlers
+        Main.registerHandler(MESSAGE_CHANNELS.EVENTHUB_MONITOR_START, handleEventHubMonitorStart);
+        Main.registerHandler(MESSAGE_CHANNELS.EVENTHUB_MONITOR_STOP, handleEventHubMonitorStop);
+
+        // File system IPC handlers
+        Main.registerHandler(MESSAGE_CHANNELS.FILE_READ, handleFileRead);
+        Main.registerHandler(MESSAGE_CHANNELS.FILE_READ_NAIVE, handleFileReadNaive);
+        Main.registerHandler(MESSAGE_CHANNELS.DIRECTORIES_LIST, handleDirectoriesList);
     }
 
     private static async loadTarget(redirect?: string): Promise<void> {
@@ -122,16 +137,6 @@ class Main {
         mainWindowState.manage(Main.mainWindow);
 
         Main.mainWindow.loadFile(Main.target);
-        try {
-            const customPort = parseInt(process.env.AZURE_IOT_EXPLORER_PORT); // tslint:disable-line:radix
-            if (customPort && !isNaN(customPort)) {
-                Main.mainWindow.webContents.executeJavaScript(`localStorage.setItem("CUSTOM_CONTROLLER_PORT", ${customPort});`);
-            } else {
-                Main.mainWindow.webContents.executeJavaScript(`localStorage.removeItem("CUSTOM_CONTROLLER_PORT");`);
-            }
-        } catch {
-            // nothing
-        }
         Main.mainWindow.on('closed', Main.onWindowClosed);
 
         Main.setErrorBoundary();

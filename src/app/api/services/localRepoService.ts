@@ -2,33 +2,52 @@
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License
  **********************************************************/
-import { CONTROLLER_API_ENDPOINT, DataPlaneStatusCode, DEFAULT_DIRECTORY, GET_DIRECTORIES, READ_FILE, READ_FILE_NAIVE } from './../../constants/apiConstants';
+import { getFilesInterface } from '../shared/interfaceUtils';
 import { ModelDefinitionNotFound } from '../models/modelDefinitionNotFoundError';
 import { ModelDefinitionNotValidJsonError } from '../models/modelDefinitionNotValidJsonError';
+import { IpcErrorCode } from '../../../../public/types/ipcTypes';
 
 export const fetchLocalFile = async (path: string, fileName: string): Promise<object> => {
-    const response = await fetch(`${CONTROLLER_API_ENDPOINT}${READ_FILE}/${encodeURIComponent(path)}/${encodeURIComponent(fileName)}`);
-    if (await response.status === DataPlaneStatusCode.NoContentSuccess || response.status === DataPlaneStatusCode.InternalServerError) {
+    const filesInterface = getFilesInterface();
+    const result = await filesInterface.readFile(path, fileName);
+
+    if (!result.success) {
+        const error = result.error!;
+        if (error.code === IpcErrorCode.FILE_NOT_FOUND || error.code === IpcErrorCode.INTERNAL_ERROR) {
+            throw new ModelDefinitionNotFound();
+        }
+        if (error.code === IpcErrorCode.INVALID_JSON) {
+            throw new ModelDefinitionNotValidJsonError(error.message);
+        }
+        throw new Error(error.message);
+    }
+
+    // null data means no content found
+    if (result.data === null) {
         throw new ModelDefinitionNotFound();
     }
-    if (await response.status === DataPlaneStatusCode.NotFound) {
-        throw new ModelDefinitionNotValidJsonError(await response.text());
-    }
-    return response.json();
+
+    return result.data;
 };
 
 export const fetchLocalFileNaive = async (path: string, fileName: string): Promise<object> => {
-    const response = await fetch(`${CONTROLLER_API_ENDPOINT}${READ_FILE_NAIVE}/${encodeURIComponent(path)}/${encodeURIComponent(fileName)}`);
-    if (await response.status === DataPlaneStatusCode.NoContentSuccess ||
-        response.status === DataPlaneStatusCode.InternalServerError ||
-        response.status === DataPlaneStatusCode.NotFound)
-    {
+    const filesInterface = getFilesInterface();
+    const result = await filesInterface.readFileNaive(path, fileName);
+
+    if (!result.success) {
         throw new ModelDefinitionNotFound();
     }
-    return response.json();
+
+    return result.data!;
 };
 
 export const fetchDirectories = async (path: string): Promise<string[]> => {
-    const response = await fetch(`${CONTROLLER_API_ENDPOINT}${GET_DIRECTORIES}/${encodeURIComponent(path || DEFAULT_DIRECTORY)}`);
-    return response.json();
+    const filesInterface = getFilesInterface();
+    const result = await filesInterface.listDirectories(path || '$DEFAULT');
+
+    if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to fetch directories');
+    }
+
+    return result.data!;
 };

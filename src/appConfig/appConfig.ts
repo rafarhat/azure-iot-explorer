@@ -6,9 +6,7 @@ export enum AuthMode {
 }
 
 export enum HostMode {
-    Browser = 'browser',
     Electron = 'electron',
-    Debug = 'debug'
 }
 
 export interface AppConfigInterface {
@@ -20,7 +18,6 @@ export interface AppConfigInterface {
         client: string;
     };
     azureResourceManagementEndpoint?: string;
-    controllerPort: number;
     telemetryConnString: string;
 }
 

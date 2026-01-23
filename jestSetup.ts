@@ -5,7 +5,7 @@
 import { setIconOptions } from '@fluentui/react';
 import * as Enzyme from 'enzyme';
 import * as Adapter from 'enzyme-adapter-react-16';
-import { appConfig } from './src/appConfig/appConfig'
+import { appConfig, HostMode } from './src/appConfig/appConfig'
 
 // tslint:disable-next-line: no-string-literal
 global.Headers = jest.fn();
@@ -29,7 +29,32 @@ jest.mock('react-i18next', () => ({
 }));
 
 jest.mock('./src/appConfig/appConfig', () => ({
-  ...jest.requireActual('./src/appConfig/appConfig'), 
+  ...jest.requireActual('./src/appConfig/appConfig'),
   appConfig: {
+    hostMode: 'electron',  // Use electron mode in tests
     telemetryConnString: 'InstrumentationKey=4e4b375e-0c49-42e3-8a51-20b22ce36181;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/'
-}}));
+  }
+}));
+
+// Mock the IPC interfaces for tests
+const mockFilesInterface = {
+  readFile: jest.fn(),
+  readFileNaive: jest.fn(),
+  listDirectories: jest.fn()
+};
+
+const mockDataPlaneInterface = {
+  request: jest.fn()
+};
+
+const mockEventHubInterface = {
+  startMonitoring: jest.fn(),
+  stopMonitoring: jest.fn(),
+  onMessages: jest.fn(),
+  removeMessagesListener: jest.fn()
+};
+
+// Mock window APIs
+(window as any).api_files = mockFilesInterface;
+(window as any).api_dataplane = mockDataPlaneInterface;
+(window as any).api_eventhub = mockEventHubInterface;

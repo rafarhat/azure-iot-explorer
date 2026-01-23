@@ -9,7 +9,7 @@ import { ResourceKeys } from '../../../../localization/resourceKeys';
 import { getDeviceIdFromQueryString, getModuleIdentityIdFromQueryString } from '../../../shared/utils/queryStringHelper';
 import { SynchronizationStatus } from '../../../api/models/synchronizationStatus';
 import { MonitorEventsParameters } from '../../../api/parameters/deviceParameters';
-import { DEFAULT_CONSUMER_GROUP, WEBSOCKET_ENDPOINT } from '../../../constants/apiConstants';
+import { DEFAULT_CONSUMER_GROUP } from '../../../constants/apiConstants';
 import { HeaderView } from '../../../shared/components/headerView';
 import { useDeviceEventsStateContext } from '../context/deviceEventsStateContext';
 import { usePnpStateContext } from '../../pnp/context/pnpStateContext';
@@ -22,9 +22,10 @@ import { DeviceContentTypePanel } from './deviceContentTypePanel';
 import { Loader } from './loader';
 import { EventsContent } from './eventsContent';
 import { SystemPropertyCheckBox } from './systemPropertyCheckBox';
+import { getEventHubInterface } from '../../../api/shared/interfaceUtils';
+import { EventHubMessage } from '../../../../../public/types/ipcTypes';
 import './deviceEvents.scss';
 
-let client: WebSocket;
 export const DeviceEvents: React.FC = () => {
     const { search } = useLocation();
     const deviceId = getDeviceIdFromQueryString(search);
@@ -54,27 +55,44 @@ export const DeviceEvents: React.FC = () => {
     // message content type specific
     const [showContentTypePanel, setShowContentTypePanel] = React.useState(false);
 
+    // IPC message handler reference for cleanup
+    const messageHandlerRef = React.useRef<((messages: EventHubMessage[]) => void) | null>(null);
+
     React.useEffect(
         () => {
             return () => {
                 stopMonitoring();
-                client?.close();
+                // Cleanup IPC listener
+                if (messageHandlerRef.current) {
+                    try {
+                        const eventHubInterface = getEventHubInterface();
+                        eventHubInterface.removeMessagesListener(messageHandlerRef.current);
+                    } catch {
+                        // Ignore if interface not available
+                    }
+                }
             };
         },
         []);
 
     React.useEffect(
         () => {
-            client = new WebSocket(WEBSOCKET_ENDPOINT);
-        },
-        []);
-
-    React.useEffect(
-        () => {
             if (monitoringData) {
-                client.onmessage = message => {
-                    api.setEvents(JSON.parse(message.data));
+                // Setup IPC message listener
+                const handleMessages = (messages: EventHubMessage[]) => {
+                    // Convert EventHubMessage to the format expected by the component
+                    const formattedMessages = messages.map(msg => ({
+                        body: msg.body,
+                        enqueuedTime: msg.enqueuedTime,
+                        properties: msg.properties,
+                        systemProperties: msg.systemProperties
+                    }));
+                    api.setEvents(formattedMessages);
                 };
+
+                messageHandlerRef.current = handleMessages;
+                const eventHubInterface = getEventHubInterface();
+                eventHubInterface.onMessages(handleMessages);
             }
         },
         [monitoringData]);
@@ -142,12 +160,20 @@ export const DeviceEvents: React.FC = () => {
     };
 
     const stopMonitoring = () => {
+        // Remove IPC listener when stopping
+        if (messageHandlerRef.current) {
+            try {
+                const eventHubInterface = getEventHubInterface();
+                eventHubInterface.removeMessagesListener(messageHandlerRef.current);
+                messageHandlerRef.current = null;
+            } catch {
+                // Ignore if interface not available
+            }
+        }
         api.stopEventsMonitoring();
     };
 
     const fetchData = () => {
-        client.onopen = () => { // intentionally blank
-        };
         let parameters: MonitorEventsParameters = {
             consumerGroup,
             decoderPrototype,

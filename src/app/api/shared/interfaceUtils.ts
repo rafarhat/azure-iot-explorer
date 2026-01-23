@@ -4,6 +4,9 @@
  **********************************************************/
 import { SettingsInterface } from '../../../../public/interfaces/settingsInterface';
 import { AuthenticationInterface } from './../../../../public/interfaces/authenticationInterface';
+import { DataPlaneInterface } from '../../../../public/interfaces/dataPlaneInterface';
+import { EventHubInterface } from '../../../../public/interfaces/eventHubInterface';
+import { FilesInterface } from '../../../../public/interfaces/filesInterface';
 import { API_INTERFACES } from '../../../../public/constants';
 import { appConfig, HostMode } from '../../../appConfig/appConfig';
 import { HIGH_CONTRAST } from '../../constants/browserStorage';
@@ -36,6 +39,30 @@ export const getAuthenticationInterface = (): AuthenticationInterface => {
     }
 
     return getElectronInterface(API_INTERFACES.AUTHENTICATION);
+};
+
+export const getDataPlaneInterface = (): DataPlaneInterface => {
+    if (appConfig.hostMode !== HostMode.Electron) {
+        throw new Error(NOT_AVAILABLE);
+    }
+
+    return getElectronInterface(API_INTERFACES.DATAPLANE);
+};
+
+export const getEventHubInterface = (): EventHubInterface => {
+    if (appConfig.hostMode !== HostMode.Electron) {
+        throw new Error(NOT_AVAILABLE);
+    }
+
+    return getElectronInterface(API_INTERFACES.EVENTHUB);
+};
+
+export const getFilesInterface = (): FilesInterface => {
+    if (appConfig.hostMode !== HostMode.Electron) {
+        throw new Error(NOT_AVAILABLE);
+    }
+
+    return getElectronInterface(API_INTERFACES.FILES);
 };
 
 export const getElectronInterface = <T>(name: string): T => {

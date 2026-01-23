@@ -23,7 +23,7 @@ import { buildQueryString } from '../shared/utils';
 import { Message } from '../models/messages';
 import { Twin, Device, DataPlaneResponse } from '../models/device';
 import { DeviceIdentity } from '../models/deviceIdentity';
-import { dataPlaneConnectionHelper, dataPlaneResponseHelper, request, DATAPLANE_CONTROLLER_ENDPOINT, DataPlaneRequest } from './dataplaneServiceHelper';
+import { dataPlaneConnectionHelper, dataPlaneResponseHelper, request, DataPlaneRequest } from './dataplaneServiceHelper';
 import { parseEventHubMessage } from './eventHubMessageHelper';
 import { AppInsightsClient } from '../../shared/appTelemetry/appInsightsClient';
 import { TELEMETRY_EVENTS } from '../../constants/telemetry';
@@ -56,7 +56,7 @@ export const fetchDeviceTwin = async (parameters: FetchDeviceTwinParameters): Pr
         sharedAccessSignature: connectionInformation.sasToken
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -72,7 +72,7 @@ export const updateDeviceTwin = async (parameters: Twin): Promise<Twin> => {
         sharedAccessSignature: connectionInformation.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -97,7 +97,7 @@ export const invokeDirectMethod = async (parameters: InvokeMethodParameters): Pr
         sharedAccessSignature: connectionInfo.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -122,7 +122,7 @@ export const cloudToDeviceMessage = async (params: CloudToDeviceMessageParameter
         sharedAccessSignature: connectionInfo.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -142,7 +142,7 @@ export const addDevice = async (parameters: AddDeviceParameters): Promise<Device
         sharedAccessSignature: connectionInfo.sasToken
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -165,7 +165,7 @@ export const updateDevice = async (parameters: UpdateDeviceParameters): Promise<
 
     (dataPlaneRequest.headers as any)[HEADERS.IF_MATCH] = `"${parameters.deviceIdentity.etag}"`; // tslint:disable-line: no-any
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -184,7 +184,7 @@ export const fetchDevice = async (parameters: FetchDeviceParameters): Promise<De
         sharedAccessSignature: connectionInfo.sasToken
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };
@@ -213,12 +213,12 @@ export const fetchDevices = async (parameters: FetchDevicesParameters): Promise<
     }
 
     try {
-        const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
-        AppInsightsClient.getInstance()?.trackEvent({name: TELEMETRY_EVENTS.FETCH_DEVICES}, {status: response.status.toString(), statusText: response.statusText});
-        const result = await dataPlaneResponseHelper(response);
+        const response = await request(null, dataPlaneRequest);
+        const result = await dataPlaneResponseHelper<Device[]>(response);
+        AppInsightsClient.getInstance()?.trackEvent({name: TELEMETRY_EVENTS.FETCH_DEVICES}, {status: 'success'});
         return result;
     } catch (e) {
-        AppInsightsClient.getInstance()?.trackEvent({name: TELEMETRY_EVENTS.FETCH_DEVICES}, {status: 'N/A', statusText: e.toString()});
+        AppInsightsClient.getInstance()?.trackEvent({name: TELEMETRY_EVENTS.FETCH_DEVICES}, {status: 'error', statusText: e.toString()});
         throw (e);
     }
 };
@@ -246,7 +246,7 @@ export const deleteDevices = async (parameters: DeleteDevicesParameters) => {
         sharedAccessSignature: connectionInfo.sasToken,
     };
 
-    const response = await request(DATAPLANE_CONTROLLER_ENDPOINT, dataPlaneRequest);
+    const response = await request(null, dataPlaneRequest);
     const result = await dataPlaneResponseHelper(response);
     return result && result.body;
 };

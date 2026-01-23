@@ -16,7 +16,7 @@ export interface Device {
 
 export interface DataPlaneResponse<T> {
     body: T;
-    headers: unknown;
+    headers?: Record<string, string>;
 }
 
 export interface Twin {
