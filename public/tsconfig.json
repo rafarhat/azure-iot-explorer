@@ -16,6 +16,7 @@
         "contextBridge.ts",
         "factories/**",
         "utils/invokeHelper.ts",
-        "interfaces/**"
+        "interfaces/**",
+        "**/*.spec.ts"
     ]
 }

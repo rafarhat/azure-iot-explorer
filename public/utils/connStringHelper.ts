@@ -17,6 +17,7 @@ import { Buffer } from "buffer";
 import { AmqpError, Connection, ReceiverEvents, parseConnectionString } from "rhea-promise";
 import * as rheaPromise from "rhea-promise";
 import { ErrorNameConditionMapper as AMQPError } from "@azure/core-amqp";
+import { validateAzureIoTHostname, validateEventHubHostname } from "../handlers/urlValidator";
 
 /**
  * Type guard for AmqpError.
@@ -66,6 +67,11 @@ export async function convertIotHubToEventHubsConnectionString(connectionString:
         throw new Error(`Invalid IotHub connection string.`);
     }
 
+    // Validate hostname to prevent SSRF
+    if (!validateAzureIoTHostname(HostName)) {
+        throw new Error('Invalid IoT Hub hostname: must be a valid Azure IoT Hub endpoint (*.azure-devices.net)');
+    }
+
     //Extract the IotHub name from the hostname.
     const [iotHubName] = HostName.split(".");
 
@@ -109,6 +115,8 @@ export async function convertIotHubToEventHubsConnectionString(connectionString:
             const regexResults = regex.exec(iotAddress);
             if (!hostname || !regexResults) {
                 reject(error);
+            } else if (!validateEventHubHostname(hostname)) {
+                reject(new Error('Invalid EventHub redirect hostname: must be a valid Azure Event Hubs endpoint (*.servicebus.windows.net)'));
             } else {
                 const eventHubName = regexResults[1];
                 resolve(

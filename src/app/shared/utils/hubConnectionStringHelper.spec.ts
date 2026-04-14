@@ -25,8 +25,20 @@ describe('hubConnectionStringHelper', () => {
 
     it('validates event hub connection string', () => {
         expect(isValidEventHubConnectionString(null)).toEqual(true);
-        expect(isValidEventHubConnectionString('Endpoint=sb://123/;SharedAccessKeyName=456;SharedAccessKey=789')).toEqual(true);
+        expect(isValidEventHubConnectionString('Endpoint=sb://mynamespace.servicebus.windows.net/;SharedAccessKeyName=456;SharedAccessKey=789')).toEqual(true);
+        expect(isValidEventHubConnectionString('Endpoint=sb://my-ns.privatelink.servicebus.windows.net/;SharedAccessKeyName=456;SharedAccessKey=789')).toEqual(true);
         expect(isValidEventHubConnectionString('Endpoint=sb://123/;SharedAccessKeyName=456;SharedAccess=789')).toEqual(false);
+    });
+
+    it('rejects event hub connection string with attacker hostname', () => {
+        expect(isValidEventHubConnectionString('Endpoint=sb://evil.com/;SharedAccessKeyName=456;SharedAccessKey=789')).toEqual(false);
+        expect(isValidEventHubConnectionString('Endpoint=sb://attacker-controlled-host.com;SharedAccessKeyName=test;SharedAccessKey=dGVzdA==')).toEqual(false);
+    });
+
+    it('rejects event hub connection string with spoofed hostname suffix', () => {
+        expect(isValidEventHubConnectionString('Endpoint=sb://ns.servicebus.windows.net.evil.com/;SharedAccessKeyName=x;SharedAccessKey=y')).toEqual(false);
+        expect(isValidEventHubConnectionString('Endpoint=sb://ns.servicebus.windows.netEVIL/;SharedAccessKeyName=x;SharedAccessKey=y')).toEqual(false);
+        expect(isValidEventHubConnectionString('Endpoint=sb://ns.servicebus.windows.net/evil.com;SharedAccessKeyName=x;SharedAccessKey=y')).toEqual(false);
     });
 
     it('formats connection strings', () => {
