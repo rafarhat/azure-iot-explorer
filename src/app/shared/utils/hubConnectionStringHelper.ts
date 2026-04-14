@@ -38,7 +38,7 @@ export const isValidEventHubConnectionString = (connectionString: string): boole
     if (!connectionString) {
         return true;
     }
-    const pattern = new RegExp('^Endpoint=sb://.*;SharedAccessKeyName=.*;SharedAccessKey=.*$');
+    const pattern = new RegExp('^Endpoint=sb://[\\w\\-]+(\\.(privatelink))?\\.servicebus\\.windows\\.net\\/?;SharedAccessKeyName=.*;SharedAccessKey=.*$');
     return pattern.test(connectionString);
 };
 

@@ -6,6 +6,9 @@
 // Allowed Azure IoT Hub domain suffix
 const ALLOWED_DOMAIN_SUFFIX = '.azure-devices.net';
 
+// Allowed Azure Event Hubs domain suffix
+const ALLOWED_EVENTHUB_DOMAIN_SUFFIX = '.servicebus.windows.net';
+
 // Allowlist of headers that can be passed through from client
 const ALLOWED_HEADERS = new Set([
     'content-type',
@@ -28,7 +31,7 @@ const BLOCKED_HEADERS = new Set([
 ]);
 
 /**
- * Validates hostname is exactly *.azure-devices.net
+ * Validates hostname is *.azure-devices.net or *.privatelink.azure-devices.net
  * - No path components (no slashes)
  * - No special characters except dots and hyphens in valid positions
  * - Each label follows DNS naming rules
@@ -59,16 +62,25 @@ export function validateAzureIoTHostname(hostname: string): boolean {
 
     // Split into labels and validate each
     // e.g., 'myhub.azure-devices.net' -> ['myhub', 'azure-devices', 'net']
+    // e.g., 'myhub.privatelink.azure-devices.net' -> ['myhub', 'privatelink', 'azure-devices', 'net']
     const labels = normalizedHost.split('.');
 
-    // Must have exactly 3 labels: <hubname>.azure-devices.net
-    if (labels.length !== 3) {
+    // Must have exactly 3 labels (<hubname>.azure-devices.net)
+    // or exactly 4 labels (<hubname>.privatelink.azure-devices.net)
+    if (labels.length !== 3 && labels.length !== 4) {
         return false;
     }
 
-    // Verify the domain is exactly 'azure-devices.net'
-    if (labels[1] !== 'azure-devices' || labels[2] !== 'net') {
-        return false;
+    if (labels.length === 3) {
+        // Verify the domain is exactly 'azure-devices.net'
+        if (labels[1] !== 'azure-devices' || labels[2] !== 'net') {
+            return false;
+        }
+    } else {
+        // 4 labels: second must be 'privatelink'
+        if (labels[1] !== 'privatelink' || labels[2] !== 'azure-devices' || labels[3] !== 'net') {
+            return false;
+        }
     }
 
     // Validate hub name (first label) follows DNS naming rules:
@@ -87,6 +99,81 @@ export function validateAzureIoTHostname(hostname: string): boolean {
     }
 
     return true;
+}
+
+/**
+ * Validates hostname is *.servicebus.windows.net or *.privatelink.servicebus.windows.net
+ * - No path components (no slashes)
+ * - No special characters except dots and hyphens in valid positions
+ * - Each label follows DNS naming rules
+ * - Must end with .servicebus.windows.net
+ */
+export function validateEventHubHostname(hostname: string): boolean {
+    if (!hostname || typeof hostname !== 'string') {
+        return false;
+    }
+
+    const normalizedHost = hostname.toLowerCase().trim();
+
+    if (!normalizedHost.endsWith(ALLOWED_EVENTHUB_DOMAIN_SUFFIX)) {
+        return false;
+    }
+
+    // Check for path injection
+    if (/[\/\\%]/.test(normalizedHost)) {
+        return false;
+    }
+
+    // Check for dangerous characters
+    if (/[@#\?\&\=\:]/.test(normalizedHost)) {
+        return false;
+    }
+
+    // e.g., 'mynamespace.servicebus.windows.net' -> ['mynamespace', 'servicebus', 'windows', 'net']
+    // e.g., 'mynamespace.privatelink.servicebus.windows.net' -> ['mynamespace', 'privatelink', 'servicebus', 'windows', 'net']
+    const labels = normalizedHost.split('.');
+
+    if (labels.length !== 4 && labels.length !== 5) {
+        return false;
+    }
+
+    if (labels.length === 4) {
+        if (labels[1] !== 'servicebus' || labels[2] !== 'windows' || labels[3] !== 'net') {
+            return false;
+        }
+    } else {
+        if (labels[1] !== 'privatelink' || labels[2] !== 'servicebus' || labels[3] !== 'windows' || labels[4] !== 'net') {
+            return false;
+        }
+    }
+
+    const namespaceName = labels[0];
+    const labelRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+
+    if (namespaceName.length === 0 || namespaceName.length > 63) {
+        return false;
+    }
+
+    if (!labelRegex.test(namespaceName)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Extract hostname from an EventHub connection string of the form:
+ * Endpoint=sb://<hostname>/;SharedAccessKeyName=...;SharedAccessKey=...
+ */
+export function extractEventHubHostname(connectionString: string): string {
+    if (!connectionString || typeof connectionString !== 'string') {
+        throw new Error('Invalid EventHub connection string: missing or empty');
+    }
+    const match = connectionString.match(/Endpoint=sb:\/\/([^/;\s]+)/i);
+    if (!match || !match[1]) {
+        throw new Error('Invalid EventHub connection string: unable to extract Endpoint hostname');
+    }
+    return match[1];
 }
 
 /**

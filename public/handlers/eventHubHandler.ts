@@ -10,6 +10,11 @@ import { ErrorNameConditionMapper as AMQPError } from '@azure/core-amqp';
 import { EventHubConsumerClient, Subscription, ReceivedEventData, earliestEventPosition } from '@azure/event-hubs';
 import { BrowserWindow } from 'electron';
 import { MESSAGE_CHANNELS } from '../constants';
+import {
+    validateAzureIoTHostname,
+    validateEventHubHostname,
+    extractEventHubHostname
+} from './urlValidator';
 
 export interface Message {
     body: any; // tslint:disable-line:no-any
@@ -68,6 +73,10 @@ export const handleStopEventHubMonitoring = async (): Promise<void> => {
  */
 const initializeEventHubClient = async (params: StartEventHubMonitoringRequest): Promise<void> => {
     if (params.customEventHubConnectionString) {
+        const eventHubHost = extractEventHubHostname(params.customEventHubConnectionString);
+        if (!validateEventHubHostname(eventHubHost)) {
+            throw new Error('Invalid EventHub hostname: must be a valid Azure Event Hubs endpoint (*.servicebus.windows.net)');
+        }
         client = new EventHubConsumerClient(params.consumerGroup, params.customEventHubConnectionString);
     } else {
         client = new EventHubConsumerClient(
@@ -194,6 +203,11 @@ export async function convertIotHubToEventHubsConnectionString(connectionString:
         throw new Error('Invalid IotHub connection string.');
     }
 
+    // Validate hostname to prevent SSRF
+    if (!validateAzureIoTHostname(HostName)) {
+        throw new Error('Invalid IoT Hub hostname: must be a valid Azure IoT Hub endpoint (*.azure-devices.net)');
+    }
+
     // Extract the IotHub name from the hostname.
     const [iotHubName] = HostName.split('.');
 
@@ -236,6 +250,8 @@ export async function convertIotHubToEventHubsConnectionString(connectionString:
                 const regexResults = regex.exec(iotAddress);
                 if (!hostname || !regexResults) {
                     reject(error);
+                } else if (!validateEventHubHostname(hostname)) {
+                    reject(new Error('Invalid EventHub redirect hostname: must be a valid Azure Event Hubs endpoint (*.servicebus.windows.net)'));
                 } else {
                     const eventHubName = regexResults[1];
                     resolve(
