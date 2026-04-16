@@ -33,6 +33,9 @@
         "msi"
       ]
     },
+    "msi": {
+      "additionalLightArgs": ["-sval"]
+    },
     "publish": null
   },
   "scripts": {
