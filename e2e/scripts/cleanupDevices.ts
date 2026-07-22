@@ -1,11 +1,10 @@
-import { AzureCli } from '../fixtures/azureCli.ts';
 import { loadE2EEnvironment, redactSecrets } from '../fixtures/environment.ts';
+import { IoTHubRegistry } from '../fixtures/iotHubRegistry.ts';
 
 const main = async (): Promise<void> => {
     const environment = loadE2EEnvironment();
-    const azureCli = new AzureCli(environment);
-    await azureCli.preflight();
-    const deletedDevices = await azureCli.cleanupDevicesByPrefix('e2e-');
+    const iotHubRegistry = new IoTHubRegistry(environment);
+    const deletedDevices = await iotHubRegistry.cleanupDevicesByPrefix('e2e-');
     process.stdout.write(`Deleted ${deletedDevices.length} E2E device(s).\n`);
 };
 

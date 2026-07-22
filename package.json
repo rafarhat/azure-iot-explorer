@@ -228,6 +228,9 @@
       "node_modules/(?!react-movable|@azure/event-hubs|@azure/core-amqp|@azure/core-auth|@azure/core-rest-pipeline|@azure/core-tracing|@azure/core-util|@azure/abort-controller|@azure/logger|@typespec/ts-http-runtime|@rjsf/utils|@rjsf/core|@rjsf/fluent-ui|@x0k/json-schema-merge|uuid)"
     ],
     "testRegex": "(\\.|/)(spec)\\.(tsx?)$",
+    "testPathIgnorePatterns": [
+      "<rootDir>/e2e/"
+    ],
     "moduleNameMapper": {
       "^.+\\.(scss)$": "<rootDir>/scss-stub.js",
       ".+\\appconfig.ENV.json": "<rootDir>/src/appConfig/appConfig.dev.json"

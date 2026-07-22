@@ -5,7 +5,7 @@ import { DeviceListPage } from '../pages/deviceListPage';
 
 test.describe.configure({ timeout: 360_000 });
 
-test('creates and deletes a device through the UI', async ({ azureCli, deviceRegistry, environment, page }) => {
+test('creates and deletes a device through the UI', async ({ iotHubRegistry, deviceRegistry, environment, page }) => {
     const deviceId = createDeviceId('crud');
     deviceRegistry.track(deviceId);
 
@@ -15,7 +15,7 @@ test('creates and deletes a device through the UI', async ({ azureCli, deviceReg
     await authentication.connectWithConnectionString(environment.connectionString);
     await devices.createDevice(deviceId);
     await devices.expectDeviceCreated(deviceId);
-    await azureCli.waitForDeviceQueryable(deviceId);
+    await iotHubRegistry.waitForDeviceQueryable(deviceId);
     await devices.returnToDeviceList();
     await devices.deleteDevice(deviceId);
     await devices.expectDeviceDeleted(deviceId);

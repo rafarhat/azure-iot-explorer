@@ -24,7 +24,6 @@ interface SimulatorOptions {
     properties?: string;
 }
 
-const NOT_FOUND_PATTERN = /DeviceNotFound|ResourceNotFound|not found|does not exist/i;
 const MAX_COMMAND_OUTPUT = 10 * 1024 * 1024;
 
 interface AzureCliExecutable {
@@ -182,76 +181,20 @@ export class AzureCli {
         }
     }
 
-    public async createDevice(deviceId: string): Promise<void> {
-        await this.run([
-            'iot', 'hub', 'device-identity', 'create',
-            '--hub-name', this.environment.hubName,
-            '--device-id', deviceId,
-            '--output', 'none',
-            '--only-show-errors',
-        ]);
-    }
-
-    public async deleteDevice(deviceId: string): Promise<void> {
-        const result = await this.runAllowFailure([
-            'iot', 'hub', 'device-identity', 'delete',
-            '--hub-name', this.environment.hubName,
-            '--device-id', deviceId,
-            '--output', 'none',
-            '--only-show-errors',
-        ]);
-
-        if (result.exitCode !== 0 && !NOT_FOUND_PATTERN.test(`${result.stderr}\n${result.stdout}`)) {
-            throw this.commandError(result, `Failed to delete E2E device ${deviceId}.`);
-        }
-    }
-
-    public async listDevicesByPrefix(prefix: string): Promise<string[]> {
-        if (!/^e2e-[a-z0-9-]*$/.test(prefix)) {
-            throw new Error('Cleanup prefixes must start with e2e- and contain only lowercase letters, numbers, and hyphens.');
-        }
+    public async getBuiltInEventHubConnectionString(): Promise<string> {
         const result = await this.run([
-            'iot', 'hub', 'device-identity', 'list',
+            'iot', 'hub', 'connection-string', 'show',
             '--hub-name', this.environment.hubName,
-            '--query', `[?starts_with(deviceId, '${prefix}')].deviceId`,
+            '--default-eventhub',
+            '--query', 'connectionString',
             '--output', 'tsv',
             '--only-show-errors',
         ]);
-
-        return result.stdout
-            .split(/\r?\n/)
-            .map(value => value.trim())
-            .filter(Boolean);
-    }
-
-    public async cleanupDevicesByPrefix(prefix: string): Promise<string[]> {
-        const devices = await this.listDevicesByPrefix(prefix);
-        for (const deviceId of devices) {
-            await this.deleteDevice(deviceId);
+        const connectionString = result.stdout.trim();
+        if (!connectionString) {
+            throw new Error('The test hub did not return a built-in Event Hub-compatible connection string.');
         }
-        return devices;
-    }
-
-    public async waitForDeviceQueryable(deviceId: string, timeout = 240_000): Promise<void> {
-        const deadline = Date.now() + timeout;
-        let lastResult: CommandResult | undefined;
-
-        while (Date.now() < deadline) {
-            lastResult = await this.runAllowFailure([
-                'iot', 'hub', 'query',
-                '--hub-name', this.environment.hubName,
-                '--query-command', `SELECT * FROM devices WHERE STARTSWITH(devices.deviceId, '${deviceId}')`,
-                '--query', '[].deviceId',
-                '--output', 'tsv',
-                '--only-show-errors',
-            ]);
-            if (lastResult.exitCode === 0 && lastResult.stdout.split(/\r?\n/).some(value => value.trim() === deviceId)) {
-                return;
-            }
-            await new Promise(resolve => setTimeout(resolve, 5_000));
-        }
-
-        throw this.commandError(lastResult || { exitCode: 1, stderr: '', stdout: '' }, `Device ${deviceId} was not queryable within ${timeout}ms.`);
+        return connectionString;
     }
 
     public async startSimulator(options: SimulatorOptions): Promise<DeviceSimulator> {
@@ -348,6 +291,24 @@ export class DeviceSimulator {
                 throw new Error(`Timed out waiting for the Azure CLI device simulator.\n${this.diagnostics}`);
             }
             await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+
+    public async waitForExit(timeout = 60_000): Promise<void> {
+        let timeoutHandle: NodeJS.Timeout | undefined;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(
+                () => reject(new Error(`Timed out waiting for the Azure CLI device simulator to exit.\n${this.diagnostics}`)),
+                timeout
+            );
+        });
+        try {
+            const exitCode = await Promise.race([this.exitPromise, timeoutPromise]);
+            if (exitCode !== 0) {
+                throw new Error(`Azure CLI device simulator exited with code ${exitCode}.\n${this.diagnostics}`);
+            }
+        } finally {
+            clearTimeout(timeoutHandle);
         }
     }
 
