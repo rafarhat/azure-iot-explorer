@@ -6,7 +6,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import { redactSecrets } from './environment.ts';
-import type { E2EEnvironment } from './environment.ts';
+import type { E2EConfiguration } from './environment.ts';
 
 interface CommandResult {
     exitCode: number;
@@ -160,17 +160,18 @@ const execute = (executable: AzureCliExecutable, args: string[], timeout = 60_00
 
 export class AzureCli {
     public readonly executable: AzureCliExecutable;
-    public readonly environment: E2EEnvironment;
+    public readonly configuration: E2EConfiguration;
+    private connectionString?: string;
 
-    public constructor(environment: E2EEnvironment) {
+    public constructor(configuration: E2EConfiguration) {
         this.executable = resolveAzureCliExecutable();
-        this.environment = environment;
+        this.configuration = configuration;
     }
 
     public async preflight(): Promise<void> {
         await this.run(
             ['account', 'show', '--query', 'id', '--output', 'tsv'],
-            'Azure CLI is not logged in. Run `az login` before the E2E suite.'
+            'Azure CLI is not logged in or cannot access the configured subscription. Run `az login` before the E2E suite.'
         );
         const extensionResult = await execute(
             this.executable,
@@ -181,10 +182,27 @@ export class AzureCli {
         }
     }
 
+    public async getIoTHubConnectionString(): Promise<string> {
+        const result = await this.run([
+            'iot', 'hub', 'connection-string', 'show',
+            '--hub-name', this.configuration.hubName,
+            '--policy-name', 'iothubowner',
+            '--query', 'connectionString',
+            '--output', 'tsv',
+            '--only-show-errors',
+        ], 'Unable to retrieve the IoT Hub connection string. Ensure the signed-in identity can list IoT Hub keys.');
+        const connectionString = result.stdout.trim();
+        if (!connectionString) {
+            throw new Error('The test hub did not return an IoT Hub connection string.');
+        }
+        this.connectionString = connectionString;
+        return connectionString;
+    }
+
     public async getBuiltInEventHubConnectionString(): Promise<string> {
         const result = await this.run([
             'iot', 'hub', 'connection-string', 'show',
-            '--hub-name', this.environment.hubName,
+            '--hub-name', this.configuration.hubName,
             '--default-eventhub',
             '--query', 'connectionString',
             '--output', 'tsv',
@@ -201,13 +219,13 @@ export class AzureCli {
         const temporaryFiles: string[] = [];
         const args = [
             'iot', 'device', 'simulate',
-            '--hub-name', this.environment.hubName,
+            '--hub-name', this.configuration.hubName,
             '--device-id', options.deviceId,
             '--protocol', 'mqtt',
             '--msg-count', String(options.messageCount ?? 20),
             '--msg-interval', String(options.messageIntervalSeconds ?? 1),
             '--data', options.data,
-            '--subscription', this.environment.subscriptionId,
+            '--subscription', this.configuration.subscriptionId,
         ];
 
         if (options.properties) {
@@ -231,7 +249,7 @@ export class AzureCli {
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true,
         });
-        const simulator = new DeviceSimulator(processHandle, this.environment, temporaryFiles);
+        const simulator = new DeviceSimulator(processHandle, this.connectionString, temporaryFiles);
         await simulator.waitUntilReady();
         return simulator;
     }
@@ -245,17 +263,18 @@ export class AzureCli {
     }
 
     private runAllowFailure(args: string[]): Promise<CommandResult> {
-        return execute(this.executable, [...args, '--subscription', this.environment.subscriptionId]);
+        return execute(this.executable, [...args, '--subscription', this.configuration.subscriptionId]);
     }
 
     private commandError(result: CommandResult, message = 'Azure CLI command failed.'): Error {
-        const details = redactSecrets(`${result.stderr}\n${result.stdout}`.trim(), this.environment);
+        const environment = this.connectionString ? { connectionString: this.connectionString } : undefined;
+        const details = redactSecrets(`${result.stderr}\n${result.stdout}`.trim(), environment);
         return new Error(`${message}${details ? `\n${details}` : ''}`);
     }
 }
 
 export class DeviceSimulator {
-    private readonly environment: E2EEnvironment;
+    private readonly connectionString?: string;
     private output = '';
     private readonly processHandle: ChildProcessByStdio<null, Readable, Readable>;
     private readonly temporaryFiles: string[];
@@ -263,11 +282,11 @@ export class DeviceSimulator {
 
     public constructor(
         processHandle: ChildProcessByStdio<null, Readable, Readable>,
-        environment: E2EEnvironment,
+        connectionString: string | undefined,
         temporaryFiles: string[]
     ) {
         this.processHandle = processHandle;
-        this.environment = environment;
+        this.connectionString = connectionString;
         this.temporaryFiles = temporaryFiles;
         processHandle.stdout.on('data', chunk => this.output += chunk.toString());
         processHandle.stderr.on('data', chunk => this.output += chunk.toString());
@@ -275,7 +294,8 @@ export class DeviceSimulator {
     }
 
     public get diagnostics(): string {
-        return redactSecrets(this.output, this.environment);
+        const environment = this.connectionString ? { connectionString: this.connectionString } : undefined;
+        return redactSecrets(this.output, environment);
     }
 
     public async waitUntilReady(timeout = 30_000): Promise<void> {

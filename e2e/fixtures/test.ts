@@ -4,7 +4,8 @@ import path from 'node:path';
 import { _electron as electron, ElectronApplication, Page } from 'playwright';
 import { test as base, expect } from '@playwright/test';
 import { AzureCli, DeviceSimulator } from './azureCli';
-import { E2EEnvironment, loadE2EEnvironment, redactSecrets } from './environment';
+import { bootstrapE2E, E2EContext } from './bootstrap';
+import { E2EEnvironment, redactSecrets } from './environment';
 import { IoTHubRegistry } from './iotHubRegistry';
 
 interface DeviceRegistry {
@@ -18,6 +19,7 @@ interface ModuleRegistry {
 
 interface E2EWorkerFixtures {
     azureCli: AzureCli;
+    e2eContext: E2EContext;
     environment: E2EEnvironment;
     iotHubRegistry: IoTHubRegistry;
 }
@@ -40,15 +42,16 @@ interface ElectronSession {
 }
 
 export const test = base.extend<E2EFixtures, E2EWorkerFixtures>({
-    environment: [async ({}, use) => {
-        const environment = loadE2EEnvironment();
-        await use(environment);
+    e2eContext: [async ({}, use) => {
+        await use(await bootstrapE2E());
     }, { scope: 'worker' }],
 
-    azureCli: [async ({ environment }, use) => {
-        const azureCli = new AzureCli(environment);
-        await azureCli.preflight();
-        await use(azureCli);
+    environment: [async ({ e2eContext }, use) => {
+        await use(e2eContext.environment);
+    }, { scope: 'worker' }],
+
+    azureCli: [async ({ e2eContext }, use) => {
+        await use(e2eContext.azureCli);
     }, { scope: 'worker' }],
 
     iotHubRegistry: [async ({ environment }, use) => {
